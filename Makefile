@@ -1,5 +1,7 @@
-.PHONY: myxcb
+.PHONY: ALL
 
-myxcb: myxcb.go
-	go fmt myxcb.go
-	go build myxcb.go
+ALL: myxcb moveit
+
+moveit:
+	goimports -w moveit.go
+	go build moveit.go
