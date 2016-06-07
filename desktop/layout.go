@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/BurntSushi/xgbutil/ewmh"
 	"github.com/BurntSushi/xgb/xproto"
@@ -51,6 +52,22 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 	} else if position == "S" || position == "SE" || position == "SW" {
 		height = headHeight / 2
 		y = headHeight - height
+	}
+	if position == "C" {
+		x = 100
+		y = 60
+		width = headWidth - x*2
+		height = headHeight - y*2
+	}
+	if strings.HasPrefix(position, "B") {
+		height = headHeight - 120
+		width = headWidth - 200
+		if strings.HasPrefix(position, "BS") {
+			y = 120
+		}
+		if strings.HasSuffix(position, "E") {
+			x = 200
+		}
 	}
 	//x += headMinusStruts.X()
 	//y += headMinusStruts.Y()
