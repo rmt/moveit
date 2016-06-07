@@ -1,7 +1,6 @@
 .PHONY: ALL
 
-ALL: myxcb moveit
-
-moveit:
+ALL:
 	goimports -w moveit.go
 	go build moveit.go
+	strip moveit

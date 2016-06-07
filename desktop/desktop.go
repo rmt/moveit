@@ -1,4 +1,4 @@
-package mydesk
+package desktop
 
 import (
 	"fmt"
@@ -12,11 +12,34 @@ import (
 	"github.com/BurntSushi/xgbutil/xrect"
 )
 
-type MyDesk struct {
+type Desktop struct {
 	X					*xgbutil.XUtil
 	Heads				xinerama.Heads
 	HeadsMinusStruts	xinerama.Heads
 }
+
+//type Window struct {
+//	Desk				*Desktop
+//	XWindow				*xwindow.Window
+//	geometry			xrect.Rect
+//}
+//
+//func (w *Window) GetGeometry() xrect.Rect {
+//	if w.geometry == nil {
+//		dgeom, err := w.XWindow.DecorGeometry()
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//	}
+//	return w.geometry
+//}
+//
+//func (m *Desktop) NewWindow(win xproto.Window) *Window {
+//	xwin := xwindow.New(m.X, win)
+//	return &Window{
+//		XWindow: xwin,
+//	}
+//}
 
 // determine the head configuration for X
 func getHeads(xu *xgbutil.XUtil, rootgeom xrect.Rect) xinerama.Heads {
@@ -33,7 +56,7 @@ func getHeads(xu *xgbutil.XUtil, rootgeom xrect.Rect) xinerama.Heads {
 	return heads
 }
 
-func NewMyDesk() *MyDesk {
+func NewDesktop() *Desktop {
 	conn, err := xgbutil.NewConn()
 	if err != nil {
 		log.Fatal(err)
@@ -73,13 +96,13 @@ func NewMyDesk() *MyDesk {
 			strut.TopStartX, strut.TopEndX,
 			strut.BottomStartX, strut.BottomEndX)
 	}
-	return &MyDesk{
+	return &Desktop{
 		X:					conn,
 		Heads:				heads,
 		HeadsMinusStruts:	headsMinusStruts}
 }
 
-func (m *MyDesk) CurrentDesktop() uint {
+func (m *Desktop) CurrentDesktop() uint {
 	desktop, err := ewmh.CurrentDesktopGet(m.X)
 	if err != nil {
 		log.Fatal(err)
@@ -87,7 +110,23 @@ func (m *MyDesk) CurrentDesktop() uint {
 	return desktop
 }
 
-func (m *MyDesk) HeadForWindow(win xproto.Window) int {
+func (m *Desktop) GeometryForWindow(win xproto.Window) xrect.Rect {
+	dgeom, err := xwindow.New(m.X, win).DecorGeometry()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return dgeom
+}
+
+func (m *Desktop) ExtentsForWindow(win xproto.Window) *ewmh.FrameExtents {
+	extents, err := ewmh.FrameExtentsGet(m.X, win)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return extents
+}
+
+func (m *Desktop) HeadForWindow(win xproto.Window) int {
 	dgeom, err := xwindow.New(m.X, win).DecorGeometry()
 	if err != nil {
 		log.Fatal(err)
@@ -100,7 +139,7 @@ func (m *MyDesk) HeadForWindow(win xproto.Window) int {
 	return 0 // if it's off the screen somewhere, return 0
 }
 
-func (m *MyDesk) ActiveWindow() xproto.Window {
+func (m *Desktop) ActiveWindow() xproto.Window {
 	w, err := ewmh.ActiveWindowGet(m.X)
 	if err != nil {
 		log.Fatal(err)
@@ -108,13 +147,19 @@ func (m *MyDesk) ActiveWindow() xproto.Window {
 	return w
 }
 
-// move a window relative to its monitor
-func (m *MyDesk) MoveResizeWindow(win xproto.Window, x, y, width, height int) {
+// move a window relative to the current head
+func (m *Desktop) MoveResizeWindow(win xproto.Window, x, y, width, height int) {
 	fmt.Printf("MoveResizeWindow(0x%x, %d, %d, %d, %d)\n", win, x, y, width, height)
+	headnr := m.HeadForWindow(win)
+	head := m.Heads[headnr]
+	x += head.X()
+	y += head.Y()
+	ewmh.MoveresizeWindow(m.X, win, x, y, width, height)
+	ewmh.RestackWindow(m.X, win)
 }
 
 // return channels
-func (m *MyDesk) WindowsOnCurrentDesktop() chan xproto.Window {
+func (m *Desktop) WindowsOnCurrentDesktop() chan xproto.Window {
 	c := make(chan xproto.Window)
 	go func() {
 		desktop := m.CurrentDesktop()
@@ -134,7 +179,7 @@ func (m *MyDesk) WindowsOnCurrentDesktop() chan xproto.Window {
 	return c
 }
 
-func (m *MyDesk) PrintHeadGeometry() {
+func (m *Desktop) PrintHeadGeometry() {
 	for i, head := range m.Heads {
 		fmt.Printf("\tHead              #%d : %s\n", i, head)
 	}
@@ -143,7 +188,7 @@ func (m *MyDesk) PrintHeadGeometry() {
 	}
 }
 
-func (m *MyDesk) PrintWindowSummary(win xproto.Window) {
+func (m *Desktop) PrintWindowSummary(win xproto.Window) {
 	name, err := ewmh.WmNameGet(m.X, win)
 	if err != nil || len(name) == 0 {
 		name = "N/A"
@@ -157,7 +202,7 @@ func (m *MyDesk) PrintWindowSummary(win xproto.Window) {
 	fmt.Printf("\tGeometry: %s (head #%d)\n", dgeom, head)
 }
 
-func (m *MyDesk) PrintWindowsOnCurrentDesktop() {
+func (m *Desktop) PrintWindowsOnCurrentDesktop() {
 	fmt.Printf("Desktop #%d\n", m.CurrentDesktop())
 	for win := range m.WindowsOnCurrentDesktop() {
 		m.PrintWindowSummary(win)

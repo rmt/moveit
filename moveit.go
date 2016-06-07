@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"./mydesk"
+	"./desktop"
 )
 
 func main() {
-	desk := mydesk.NewMyDesk()
+	desk := desktop.NewDesktop()
 	activeWindow := desk.ActiveWindow()
 	fmt.Printf("Active Window: %d\n", activeWindow)
 	fmt.Printf("Head Geometry:\n")
