@@ -77,7 +77,7 @@ func NewDesktop() *Desktop {
 	 *  apply struts of top level windows against headsMinusStruts,
 	 *  modifying it in-place.
 	 */
-	clients, err := ewmh.ClientListGet(conn)
+	clients, err := ewmh.ClientListStackingGet(conn)
 	if err != nil {
 		log.Fatal(err)
 	}

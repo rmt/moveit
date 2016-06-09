@@ -13,13 +13,22 @@ func main() {
 	fmt.Printf("Active Window: %d\n", activeWindow)
 	fmt.Printf("Head Geometry:\n")
 	desk.PrintHeadGeometry()
-	if len(os.Args) > 1 {
-		command := os.Args[1]
-		if command == "list" {
-			fmt.Printf("---\n")
-			desk.PrintWindowsOnCurrentDesktop()
+	printHelp := false
+	if len(os.Args) > 2 {
+		cmd := os.Args[1]
+		placement := os.Args[2]
+		if cmd == "move" {
+			desk.SmartPlacement(activeWindow, placement, 55)
+		} else if cmd == "focus" {
+			desk.SmartFocus(activeWindow, placement)
 		} else {
-			desk.SmartPlacement(activeWindow, command, 60)
+			printHelp = true
 		}
+	} else {
+		printHelp = true
+	}
+	if printHelp {
+		fmt.Printf("Syntax: %s move|focus B?[NS][EW]|C\n", os.Args[0])
+		fmt.Println("eg. move NE, move BSE (big south-east)")
 	}
 }

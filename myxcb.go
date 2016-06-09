@@ -238,7 +238,6 @@ func smart_placement(s *Screen, w *Window, position string, horizpc uint32) {
 }
 
 func main() {
-	fmt.Println("Move & resize a window")
 	conn, err := xgb.NewConn()
 	if err != nil {
 		fmt.Println(err)
@@ -252,8 +251,15 @@ func main() {
 	geom := w.GetGeometry()
 	fmt.Printf("  X: %d, Y: %d, Width: %d, Height: %d\n",
 		geom.X, geom.Y, geom.Width, geom.Height)
-	if len(os.Args) > 1 {
-		placement := os.Args[1]
-		smart_placement(&screen, &w, placement, 60)
+	if len(os.Args) > 2 {
+		cmd := os.Args[1]
+		placement := os.Args[2]
+		if cmd == "move" {
+			smart_placement(&screen, &w, placement, 60)
+		} else {
+		}
+	} else {
+		fmt.Printf("Syntax: %s move|focus B?[NS][EW]|C\n", os.Args[0])
+		fmt.Println("eg. move NE, move BSE (big south-east)")
 	}
 }
