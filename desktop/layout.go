@@ -6,27 +6,7 @@ import (
 
 	"github.com/BurntSushi/xgbutil/ewmh"
 	"github.com/BurntSushi/xgb/xproto"
-	"github.com/BurntSushi/xgbutil/xrect"
 )
-
-type LayoutClassifier interface {
-	Classify(*xrect.Rect) string
-}
-
-type LayoutPositioner interface {
-	Position(pos string) *xrect.Rect
-	NextPosition(pos string) string
-	PrevPosition(pos string) string
-}
-
-type Layout interface {
-	LayoutClassifier
-	LayoutPositioner
-}
-
-type DefaultLayout struct {
-	desk *Desktop
-}
 
 func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc int) {
 	headnum := desk.HeadForWindow(w)
@@ -69,8 +49,6 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 			x = 200
 		}
 	}
-	//x += headMinusStruts.X()
-	//y += headMinusStruts.Y()
 	height = height - extents.Top - extents.Bottom
 	width = width - extents.Left - extents.Right
 	fmt.Printf("Calling desk.MoveResizeWindow(win, x=%d, y=%d, width=%d, height=%d)\n",
@@ -81,21 +59,23 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 
 // SmartFocus will rotate focus for windows with positions between
 // minX,minY and maxX,maxY
-func (desk *Desktop) SmartFocusAt(activeWindow xproto.Window, headnum, minX, minY, maxX, maxY int) {
-	head := desk.Heads[headnum]
-	fmt.Printf("SmartFocusAt(activeWindow=0x%x headnum=%d, minX=%d, minY=%d, maxX=%d, maxY=%d)\n",
-		activeWindow, headnum, minX, minY, maxX, maxY)
-	minX += head.X()
-	minY += head.Y()
-	maxX += head.X()
-	maxY += head.Y()
-	var matchingWindows []xproto.Window
+func (desk *Desktop) SmartFocusAt(activeWindow xproto.Window, minX, minY, maxX, maxY int) {
+	fmt.Printf("SmartFocusAt(activeWindow=0x%x minX=%d, minY=%d, maxX=%d, maxY=%d)\n",
+		activeWindow, minX, minY, maxX, maxY)
+
+	var matchingWindows []xproto.Window = make([]xproto.Window, 0, 8)
+
+	i := 0
+	activeWinIndex := -1
 	for win := range(desk.WindowsOnCurrentDesktop()) {
-		desk.PrintWindowSummary(win)
 		geom := desk.GeometryForWindow(win)
-		if minX >= geom.X() && minY >= geom.Y() && maxX <= (geom.X()+geom.Width()) && maxY <= (geom.Y()+geom.Height()) {
+		if minX >= geom.X() && minY >= geom.Y() && maxX <= (geom.X()+geom.Width()) && maxY <= (geom.Y()+geom.Height()) && desk.IsWindowVisible(win) {
 			matchingWindows = append(matchingWindows, win)
 			fmt.Printf("Matched window 0x%x\n", win)
+			if(win == activeWindow) {
+				activeWinIndex = i
+			}
+			i += 1
 		}
 	}
 	if len(matchingWindows) == 0 {
@@ -107,40 +87,47 @@ func (desk *Desktop) SmartFocusAt(activeWindow xproto.Window, headnum, minX, min
 	// order.  The goal is to focus the top window at a location
 	// if it's not already focused, but iterate over all windows
 	// at the same location if the location already has focus.
-	nextWinIndex := len(matchingWindows)-1
-	if matchingWindows[nextWinIndex] == activeWindow {
-		nextWinIndex = 0 // rotate
+	var nextWinIndex int
+	if activeWinIndex > -1 {
+		nextWinIndex = (activeWinIndex+1) % len(matchingWindows)
+	} else {
+		nextWinIndex = len(matchingWindows)-1
 	}
-	if nextWinIndex >= 0 {
-		ewmh.RestackWindow(desk.X, matchingWindows[nextWinIndex])
-		ewmh.ActiveWindowReq(desk.X, matchingWindows[nextWinIndex])
-	}
+	fmt.Printf("Focusing window 0x%x (nextWinIndex==%d, activeWinIndex==%d)\n", matchingWindows[nextWinIndex], nextWinIndex, activeWinIndex)
+	ewmh.RestackWindow(desk.X, matchingWindows[nextWinIndex])
+	ewmh.ActiveWindowReq(desk.X, matchingWindows[nextWinIndex])
 }
 
 func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string) {
 	headnum := desk.HeadForWindow(activeWindow)
 	headMinusStruts := desk.HeadsMinusStruts[headnum]
 
-	minX, minY, maxX, maxY := 0, 0, 0, 0
+	var minX, minY, maxX, maxY int
 	if strings.HasPrefix(position, "BS") || strings.HasPrefix(position, "S") {
-		minY = headMinusStruts.Height() - 10
+		minY = headMinusStruts.Y() + headMinusStruts.Height() - 10
+		maxY = minY
+	} else if strings.HasPrefix(position, "BN") || strings.HasPrefix(position, "N") {
+		minY = headMinusStruts.Y() + 10
 		maxY = minY
 	} else {
 		minY = headMinusStruts.Y() + 10
-		maxY = minY
+		maxY = minY + headMinusStruts.Height() - 20
 	}
 	if strings.HasSuffix(position, "W") {
 		minX = headMinusStruts.X() + 10
 		maxX = minX
-	} else {
-		minX = headMinusStruts.Width() - 10
+	} else if strings.HasSuffix(position, "E") {
+		minX = headMinusStruts.X() + headMinusStruts.Width() - 10
 		maxX = minX
+	} else {
+		minX = headMinusStruts.X() + 10
+		maxX = minX + headMinusStruts.Width() - 20
 	}
 	if position == "C" {
 		minX = headMinusStruts.X() + 110
-		maxX = headMinusStruts.Width() - 110
+		maxX = minX + headMinusStruts.Width() - 220
 		minY = headMinusStruts.Y() + 70
-		maxY = headMinusStruts.Height() - 70
+		maxY = minY + headMinusStruts.Height() - 140
 	}
-	desk.SmartFocusAt(activeWindow, headnum, minX, minY, maxX, maxY)
+	desk.SmartFocusAt(activeWindow, minX, minY, maxX, maxY)
 }

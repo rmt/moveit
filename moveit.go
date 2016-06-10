@@ -10,7 +10,7 @@ import (
 func main() {
 	desk := desktop.NewDesktop()
 	activeWindow := desk.ActiveWindow()
-	fmt.Printf("Active Window: %d\n", activeWindow)
+	fmt.Printf("Active Window: 0x%x\n", activeWindow)
 	fmt.Printf("Head Geometry:\n")
 	desk.PrintHeadGeometry()
 	printHelp := false
@@ -31,4 +31,5 @@ func main() {
 		fmt.Printf("Syntax: %s move|focus B?[NS][EW]|C\n", os.Args[0])
 		fmt.Println("eg. move NE, move BSE (big south-east)")
 	}
+	fmt.Println("")
 }

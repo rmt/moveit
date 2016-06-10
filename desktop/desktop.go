@@ -7,53 +7,18 @@ import (
 	"github.com/BurntSushi/xgb/xproto"
 	"github.com/BurntSushi/xgbutil"
 	"github.com/BurntSushi/xgbutil/ewmh"
+	"github.com/BurntSushi/xgbutil/icccm"
 	"github.com/BurntSushi/xgbutil/xinerama"
 	"github.com/BurntSushi/xgbutil/xwindow"
 	"github.com/BurntSushi/xgbutil/xrect"
 )
 
+const PinnedDesktopNumber = 4294967295
+
 type Desktop struct {
 	X					*xgbutil.XUtil
 	Heads				xinerama.Heads
 	HeadsMinusStruts	xinerama.Heads
-}
-
-//type Window struct {
-//	Desk				*Desktop
-//	XWindow				*xwindow.Window
-//	geometry			xrect.Rect
-//}
-//
-//func (w *Window) GetGeometry() xrect.Rect {
-//	if w.geometry == nil {
-//		dgeom, err := w.XWindow.DecorGeometry()
-//		if err != nil {
-//			log.Fatal(err)
-//		}
-//	}
-//	return w.geometry
-//}
-//
-//func (m *Desktop) NewWindow(win xproto.Window) *Window {
-//	xwin := xwindow.New(m.X, win)
-//	return &Window{
-//		XWindow: xwin,
-//	}
-//}
-
-// determine the head configuration for X
-func getHeads(xu *xgbutil.XUtil, rootgeom xrect.Rect) xinerama.Heads {
-	var heads xinerama.Heads
-	if xu.ExtInitialized("XINERAMA") {
-		var err error
-		heads, err = xinerama.PhysicalHeads(xu)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		heads = xinerama.Heads{rootgeom}
-	}
-	return heads
 }
 
 func NewDesktop() *Desktop {
@@ -77,7 +42,7 @@ func NewDesktop() *Desktop {
 	 *  apply struts of top level windows against headsMinusStruts,
 	 *  modifying it in-place.
 	 */
-	clients, err := ewmh.ClientListStackingGet(conn)
+	clients, err := ewmh.ClientListGet(conn)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,12 +67,36 @@ func NewDesktop() *Desktop {
 		HeadsMinusStruts:	headsMinusStruts}
 }
 
+// determine the head configuration for X
+func getHeads(xu *xgbutil.XUtil, rootgeom xrect.Rect) xinerama.Heads {
+	var heads xinerama.Heads
+	if xu.ExtInitialized("XINERAMA") {
+		var err error
+		heads, err = xinerama.PhysicalHeads(xu)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		heads = xinerama.Heads{rootgeom}
+	}
+	return heads
+}
+
+
 func (m *Desktop) CurrentDesktop() uint {
 	desktop, err := ewmh.CurrentDesktopGet(m.X)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return desktop
+}
+
+func (desk *Desktop) IsWindowVisible(win xproto.Window) bool {
+	state, err := icccm.WmStateGet(desk.X, win)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return state.State == icccm.StateNormal || state.State == icccm.StateZoomed
 }
 
 func (m *Desktop) GeometryForWindow(win xproto.Window) xrect.Rect {
@@ -159,18 +148,18 @@ func (m *Desktop) MoveResizeWindow(win xproto.Window, x, y, width, height int) {
 }
 
 // return channels
-func (m *Desktop) WindowsOnCurrentDesktop() chan xproto.Window {
+func (desk *Desktop) WindowsOnCurrentDesktop() chan xproto.Window {
 	c := make(chan xproto.Window)
 	go func() {
-		desktop := m.CurrentDesktop()
-		windows, err := ewmh.ClientListGet(m.X)
+		desktop := desk.CurrentDesktop()
+		windows, err := ewmh.ClientListGet(desk.X)
 		if err != nil {
 			close(c)
 			log.Fatal(err)
 		}
 		for _, win := range windows {
-			windesktop, err := ewmh.WmDesktopGet(m.X, win)
-			if err == nil && windesktop == desktop {
+			windesktop, err := ewmh.WmDesktopGet(desk.X, win)
+			if err == nil && (windesktop == desktop || windesktop == PinnedDesktopNumber) {
 				c <- win
 			}
 		}
