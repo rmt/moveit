@@ -9,9 +9,13 @@ import (
 )
 
 func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc int) {
-	headnum := desk.HeadForWindow(w)
+	if w == 0 {
+		fmt.Println("No focused window. Nothing to do.")
+		return;
+	}
+	headnum := desk.GetHeadForWindow(w)
 	headMinusStruts := desk.HeadsMinusStruts[headnum]
-	extents := desk.ExtentsForWindow(w)
+	extents := desk.GetFrameExtentsForWindow(w)
 
 	headWidth, headHeight := int(headMinusStruts.Width()), int(headMinusStruts.Height())
 	x := 0
@@ -68,7 +72,7 @@ func (desk *Desktop) SmartFocusAt(activeWindow xproto.Window, minX, minY, maxX, 
 	i := 0
 	activeWinIndex := -1
 	for win := range(desk.WindowsOnCurrentDesktop()) {
-		geom := desk.GeometryForWindow(win)
+		geom := desk.GetGeometryForWindow(win)
 		if minX >= geom.X() && minY >= geom.Y() && maxX <= (geom.X()+geom.Width()) && maxY <= (geom.Y()+geom.Height()) && desk.IsWindowVisible(win) {
 			matchingWindows = append(matchingWindows, win)
 			fmt.Printf("Matched window 0x%x\n", win)
@@ -99,35 +103,42 @@ func (desk *Desktop) SmartFocusAt(activeWindow xproto.Window, minX, minY, maxX, 
 }
 
 func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string) {
-	headnum := desk.HeadForWindow(activeWindow)
+	var headnum int
+	if activeWindow != 0 {
+		headnum = desk.GetHeadForWindow(activeWindow)
+	} else {
+		headnum = desk.GetHeadForPointer()
+	}
 	headMinusStruts := desk.HeadsMinusStruts[headnum]
 
 	var minX, minY, maxX, maxY int
 	if strings.HasPrefix(position, "BS") || strings.HasPrefix(position, "S") {
-		minY = headMinusStruts.Y() + headMinusStruts.Height() - 10
+		minY = headMinusStruts.Y() + headMinusStruts.Height()
 		maxY = minY
 	} else if strings.HasPrefix(position, "BN") || strings.HasPrefix(position, "N") {
-		minY = headMinusStruts.Y() + 10
+		minY = headMinusStruts.Y()
 		maxY = minY
 	} else {
-		minY = headMinusStruts.Y() + 10
-		maxY = minY + headMinusStruts.Height() - 20
+		minY = headMinusStruts.Y()
+		maxY = minY + headMinusStruts.Height()
 	}
 	if strings.HasSuffix(position, "W") {
-		minX = headMinusStruts.X() + 10
+		minX = headMinusStruts.X()
 		maxX = minX
 	} else if strings.HasSuffix(position, "E") {
-		minX = headMinusStruts.X() + headMinusStruts.Width() - 10
+		minX = headMinusStruts.X() + headMinusStruts.Width()
 		maxX = minX
 	} else {
-		minX = headMinusStruts.X() + 10
-		maxX = minX + headMinusStruts.Width() - 20
+		minX = headMinusStruts.X()
+		maxX = minX + headMinusStruts.Width()
 	}
 	if position == "C" {
-		minX = headMinusStruts.X() + 110
-		maxX = minX + headMinusStruts.Width() - 220
-		minY = headMinusStruts.Y() + 70
-		maxY = minY + headMinusStruts.Height() - 140
+		minX = headMinusStruts.X() + 100
+		maxX = minX + headMinusStruts.Width() - 200
+		minY = headMinusStruts.Y() + 60
+		maxY = minY + headMinusStruts.Height() - 120
 	}
-	desk.SmartFocusAt(activeWindow, minX, minY, maxX, maxY)
+
+	const ErrorMargin = 35
+	desk.SmartFocusAt(activeWindow, minX+ErrorMargin, minY+ErrorMargin, maxX-ErrorMargin, maxY-ErrorMargin)
 }

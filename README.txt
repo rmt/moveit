@@ -55,5 +55,7 @@ Upcoming Features
 Bugfixes
 --------
 * If no window is focused, determine current head based on the mouse position
+  - no longer crashes
+  - TODO: check that it works on multi-head
 * Unmaximize window before moving it
 * Only focus exact-match windows ?? eg. if 80% rect correlation?

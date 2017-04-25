@@ -9,7 +9,7 @@ import (
 
 func main() {
 	desk := desktop.NewDesktop()
-	activeWindow := desk.ActiveWindow()
+	activeWindow := desk.GetActiveWindow()
 	fmt.Printf("Active Window: 0x%x\n", activeWindow)
 	fmt.Printf("Head Geometry:\n")
 	desk.PrintHeadGeometry()
