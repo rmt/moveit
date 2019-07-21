@@ -18,9 +18,9 @@ func main() {
 		cmd := os.Args[1]
 		placement := os.Args[2]
 		if cmd == "move" {
-			desk.SmartPlacement(activeWindow, placement, 55)
+			desk.SmartPlacement(activeWindow, placement, 50)
 		} else if cmd == "focus" {
-			desk.SmartFocus(activeWindow, placement)
+			desk.SmartFocus(activeWindow, placement, 50)
 		} else {
 			printHelp = true
 		}

@@ -47,6 +47,8 @@ func NewDesktop() *Desktop {
 		log.Fatalf("NewDesktop(): Getting root window geometry: %#v", err)
 	}
 
+	fmt.Printf("rootGeometry: X=%d-%d, Y=%d-%d\n", rootgeom.X(), rootgeom.Width(), rootgeom.Y(), rootgeom.Height())
+
 	// get head geometry, & then with struts
 	heads := getHeads(conn, rootgeom)
 	headsMinusStruts := getHeads(conn, rootgeom) // TODO: copy instead
@@ -136,9 +138,9 @@ func (desk *Desktop) GetHeadForPointer() int {
 	}
 	for i, head := range(desk.Heads) {
 		if int(reply.RootX) < head.X() { continue }
-		if int(reply.RootX) > head.X()+head.Width() { continue }
+		if int(reply.RootX) >= head.X()+head.Width() { continue }
 		if int(reply.RootY) < head.Y() { continue }
-		if int(reply.RootY) > head.Y()+head.Height() { continue }
+		if int(reply.RootY) >= head.Y()+head.Height() { continue }
 		return i
 	}
 	log.Fatalf("HeadForPointer(): Couldn't determine head for pointer coordinates (%d,%d)\n",
@@ -182,7 +184,8 @@ func (desk *Desktop) WindowsOnCurrentDesktop() chan xproto.Window {
 	c := make(chan xproto.Window)
 	go func() {
 		desktop := desk.GetCurrentDesktop()
-		windows, err := ewmh.ClientListGet(desk.X)
+		windows, err := ewmh.ClientListStackingGet(desk.X)
+		//windows, err := ewmh.ClientListGet(desk.X)
 		if err != nil {
 			close(c)
 			log.Fatalf("WindowsOnCurrentDesktop(): %#v", err)

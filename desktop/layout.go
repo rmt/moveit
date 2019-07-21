@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/xgbutil/ewmh"
+	"github.com/BurntSushi/xgbutil/xrect"
 	"github.com/BurntSushi/xgb/xproto"
 )
 
@@ -23,6 +24,7 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 	width := headWidth
 	height := headHeight
 
+	// horizontal
 	if position == "W" || position == "NW" || position == "SW" {
 		// left side of screen
 		width = headWidth * horizpc / 100
@@ -31,26 +33,32 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 		width = headWidth * (100 - horizpc) / 100
 		x = headWidth - width
 	}
+
+	// vertical
 	if position == "N" || position == "NE" || position == "NW" {
 		height = headHeight / 2
 	} else if position == "S" || position == "SE" || position == "SW" {
 		height = headHeight / 2
 		y = headHeight - height
 	}
+
+	// center
 	if position == "C" {
-		x = 100
-		y = 60
-		width = headWidth - x*2
-		height = headHeight - y*2
+		width = headWidth / 10 * 7
+		height = headHeight / 10 * 7
+		x = (headWidth - width) / 2
+		y = (headHeight - height) / 2
 	}
+
+	// big windows
 	if strings.HasPrefix(position, "B") {
-		height = headHeight - 120
-		width = headWidth - 200
+		width = headWidth / 10 * 7
+		height = headHeight / 10 * 7
 		if strings.HasPrefix(position, "BS") {
-			y = 120
+			y = headHeight - height
 		}
 		if strings.HasSuffix(position, "E") {
-			x = 200
+			x = headWidth - width
 		}
 	}
 	height = height - extents.Top - extents.Bottom
@@ -61,84 +69,65 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 	ewmh.RestackWindow(desk.X, w)
 }
 
-// SmartFocus will rotate focus for windows with positions between
-// minX,minY and maxX,maxY
-func (desk *Desktop) SmartFocusAt(activeWindow xproto.Window, minX, minY, maxX, maxY int) {
-	fmt.Printf("SmartFocusAt(activeWindow=0x%x minX=%d, minY=%d, maxX=%d, maxY=%d)\n",
-		activeWindow, minX, minY, maxX, maxY)
 
-	var matchingWindows []xproto.Window = make([]xproto.Window, 0, 8)
-
-	i := 0
-	activeWinIndex := -1
-	for win := range(desk.WindowsOnCurrentDesktop()) {
-		geom := desk.GetGeometryForWindow(win)
-		if minX >= geom.X() && minY >= geom.Y() && maxX <= (geom.X()+geom.Width()) && maxY <= (geom.Y()+geom.Height()) && desk.IsWindowVisible(win) {
-			matchingWindows = append(matchingWindows, win)
-			fmt.Printf("Matched window 0x%x\n", win)
-			if(win == activeWindow) {
-				activeWinIndex = i
-			}
-			i += 1
-		}
-	}
-	if len(matchingWindows) == 0 {
-		fmt.Println("No matching windows found.")
-		return
-	}
-
-	// Matching windows should be in bottom-to-top stacking
-	// order.  The goal is to focus the top window at a location
-	// if it's not already focused, but iterate over all windows
-	// at the same location if the location already has focus.
-	var nextWinIndex int
-	if activeWinIndex > -1 {
-		nextWinIndex = (activeWinIndex+1) % len(matchingWindows)
-	} else {
-		nextWinIndex = len(matchingWindows)-1
-	}
-	fmt.Printf("Focusing window 0x%x (nextWinIndex==%d, activeWinIndex==%d)\n", matchingWindows[nextWinIndex], nextWinIndex, activeWinIndex)
-	ewmh.RestackWindow(desk.X, matchingWindows[nextWinIndex])
-	ewmh.ActiveWindowReq(desk.X, matchingWindows[nextWinIndex])
-}
-
-func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string) {
+func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string, horizpc int) {
 	var headnum int
 	if activeWindow != 0 {
 		headnum = desk.GetHeadForWindow(activeWindow)
 	} else {
 		headnum = desk.GetHeadForPointer()
 	}
-	headMinusStruts := desk.HeadsMinusStruts[headnum]
+	head := desk.HeadsMinusStruts[headnum]
+	headWidth, headHeight := int(head.Width()), int(head.Height())
+	centerX := head.X() + headWidth * horizpc / 100
+	centerY := head.Y() + headHeight / 2
 
 	var minX, minY, maxX, maxY int
 	if strings.HasPrefix(position, "BS") || strings.HasPrefix(position, "S") {
-		minY = headMinusStruts.Y() + headMinusStruts.Height()
-		maxY = minY
+		minY = centerY
+		maxY = head.Y() + head.Height()
 	} else if strings.HasPrefix(position, "BN") || strings.HasPrefix(position, "N") {
-		minY = headMinusStruts.Y()
-		maxY = minY
+		minY = head.Y()
+		maxY = centerY
 	} else {
-		minY = headMinusStruts.Y()
-		maxY = minY + headMinusStruts.Height()
-	}
-	if strings.HasSuffix(position, "W") {
-		minX = headMinusStruts.X()
-		maxX = minX
-	} else if strings.HasSuffix(position, "E") {
-		minX = headMinusStruts.X() + headMinusStruts.Width()
-		maxX = minX
-	} else {
-		minX = headMinusStruts.X()
-		maxX = minX + headMinusStruts.Width()
-	}
-	if position == "C" {
-		minX = headMinusStruts.X() + 100
-		maxX = minX + headMinusStruts.Width() - 200
-		minY = headMinusStruts.Y() + 60
-		maxY = minY + headMinusStruts.Height() - 120
+		minY = head.Y()
+		maxY = minY + head.Height()
 	}
 
-	const ErrorMargin = 35
-	desk.SmartFocusAt(activeWindow, minX+ErrorMargin, minY+ErrorMargin, maxX-ErrorMargin, maxY-ErrorMargin)
+	if strings.HasSuffix(position, "W") {
+		minX = head.X()
+		maxX = centerX
+	} else if strings.HasSuffix(position, "E") {
+		minX = centerX
+		maxX = head.X() + head.Width()
+	} else {
+		minX = head.X()
+		maxX = minX + head.Width()
+	}
+
+	var newWin xproto.Window = 0
+
+	if position == "C" {
+		// only focus centered windows
+		minX = head.X() + (head.Width() / 20 * 5)
+		maxX = head.X() + (head.Width() / 20 * 15)
+		minY = head.Y() + (head.Height() / 20 * 5)
+		maxY = head.Y() + (head.Height() / 20 * 15)
+		centerRect := xrect.New(minX, minY, maxX-minX, maxY-minY)
+		newWin = desk.NextMatchingWindow(activeWindow, func(r xrect.Rect) bool {
+			//return RectInRect(centerRect, r)
+			return RectMostlyInRect(r, centerRect)
+		})
+	} else {
+		cmpRect := xrect.New(minX, minY, maxX-minX, maxY-minY)
+		newWin = desk.NextMatchingWindow(activeWindow, func(r xrect.Rect) bool {
+			winArea := r.Width() * r.Height()
+			cmpArea := cmpRect.Width() * cmpRect.Height()
+			return RectMostlyInRect(r, cmpRect) && winArea < (cmpArea * 2) && winArea > (cmpArea * 15 / 20) && EachAxisMostlyOverlaps(r, cmpRect)
+		})
+	}
+	if newWin != 0 {
+		ewmh.RestackWindow(desk.X, newWin)
+		ewmh.ActiveWindowReq(desk.X, newWin)
+	}
 }
