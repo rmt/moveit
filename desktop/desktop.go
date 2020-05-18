@@ -22,16 +22,16 @@ import (
 	"github.com/BurntSushi/xgbutil/ewmh"
 	"github.com/BurntSushi/xgbutil/icccm"
 	"github.com/BurntSushi/xgbutil/xinerama"
-	"github.com/BurntSushi/xgbutil/xwindow"
 	"github.com/BurntSushi/xgbutil/xrect"
+	"github.com/BurntSushi/xgbutil/xwindow"
 )
 
 const PinnedDesktopNumber = 4294967295
 
 type Desktop struct {
-	X					*xgbutil.XUtil
-	Heads				xinerama.Heads
-	HeadsMinusStruts	xinerama.Heads
+	X                *xgbutil.XUtil
+	Heads            xinerama.Heads
+	HeadsMinusStruts xinerama.Heads
 }
 
 func NewDesktop() *Desktop {
@@ -76,9 +76,9 @@ func NewDesktop() *Desktop {
 		)
 	}
 	return &Desktop{
-		X:					conn,
-		Heads:				heads,
-		HeadsMinusStruts:	headsMinusStruts,
+		X:                conn,
+		Heads:            heads,
+		HeadsMinusStruts: headsMinusStruts,
 	}
 }
 
@@ -97,7 +97,6 @@ func getHeads(xu *xgbutil.XUtil, rootgeom xrect.Rect) xinerama.Heads {
 	return heads
 }
 
-
 func (desk *Desktop) GetCurrentDesktop() uint {
 	desktop, err := ewmh.CurrentDesktopGet(desk.X)
 	if err != nil {
@@ -112,6 +111,19 @@ func (desk *Desktop) IsWindowVisible(win xproto.Window) bool {
 		log.Fatalf("IsWindowVisible(%d): %#v", win, err)
 	}
 	return state.State == icccm.StateNormal || state.State == icccm.StateZoomed
+}
+
+func (desk *Desktop) CanFocusWindow(win xproto.Window) bool {
+	atomNames, err := ewmh.WmWindowTypeGet(desk.X, win)
+	if err != nil {
+		log.Fatalf("IsWindowInPager(%d): %#v", win, err)
+	}
+	for _, n := range atomNames {
+		if n == "_NET_WM_WINDOW_TYPE_DESKTOP" {
+			return false
+		}
+	}
+	return true
 }
 
 func (desk *Desktop) GetGeometryForWindow(win xproto.Window) xrect.Rect {
@@ -136,11 +148,19 @@ func (desk *Desktop) GetHeadForPointer() int {
 	if err != nil {
 		log.Fatalf("GetHeadForPointer() xproto.QueryPointer: %#v", err)
 	}
-	for i, head := range(desk.Heads) {
-		if int(reply.RootX) < head.X() { continue }
-		if int(reply.RootX) >= head.X()+head.Width() { continue }
-		if int(reply.RootY) < head.Y() { continue }
-		if int(reply.RootY) >= head.Y()+head.Height() { continue }
+	for i, head := range desk.Heads {
+		if int(reply.RootX) < head.X() {
+			continue
+		}
+		if int(reply.RootX) >= head.X()+head.Width() {
+			continue
+		}
+		if int(reply.RootY) < head.Y() {
+			continue
+		}
+		if int(reply.RootY) >= head.Y()+head.Height() {
+			continue
+		}
 		return i
 	}
 	log.Fatalf("HeadForPointer(): Couldn't determine head for pointer coordinates (%d,%d)\n",
@@ -153,7 +173,7 @@ func (desk *Desktop) GetHeadForWindow(win xproto.Window) int {
 	if err != nil {
 		log.Fatalf("GetHeadForWindow(%d): %#v", win, err)
 	}
-	for i, head := range(desk.Heads) {
+	for i, head := range desk.Heads {
 		if dgeom.X() >= head.X() && dgeom.X() < (head.X()+head.Width()) && dgeom.Y() >= head.Y() && dgeom.Y() < (head.Y()+head.Height()) {
 			return i
 		}
@@ -176,7 +196,8 @@ func (desk *Desktop) MoveResizeWindow(win xproto.Window, x, y, width, height int
 	head := desk.Heads[headnr]
 	x += head.X()
 	y += head.Y()
-	ewmh.MoveresizeWindow(desk.X, win, x, y, width, height)
+	//ewmh.MoveresizeWindow(desk.X, win, x, y, width, height)
+	ewmh.MoveresizeWindowExtra(desk.X, win, x, y, width, height, xproto.GravityNorthWest, 2, true, true)
 	ewmh.RestackWindow(desk.X, win)
 }
 

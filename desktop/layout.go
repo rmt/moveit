@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/BurntSushi/xgb/xproto"
 	"github.com/BurntSushi/xgbutil/ewmh"
 	"github.com/BurntSushi/xgbutil/xrect"
-	"github.com/BurntSushi/xgb/xproto"
 )
 
 func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc int) {
 	if w == 0 {
 		fmt.Println("No focused window. Nothing to do.")
-		return;
+		return
 	}
 	headnum := desk.GetHeadForWindow(w)
 	headMinusStruts := desk.HeadsMinusStruts[headnum]
@@ -69,7 +69,6 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 	ewmh.RestackWindow(desk.X, w)
 }
 
-
 func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string, horizpc int) {
 	var headnum int
 	if activeWindow != 0 {
@@ -79,8 +78,8 @@ func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string, hor
 	}
 	head := desk.HeadsMinusStruts[headnum]
 	headWidth, headHeight := int(head.Width()), int(head.Height())
-	centerX := head.X() + headWidth * horizpc / 100
-	centerY := head.Y() + headHeight / 2
+	centerX := head.X() + headWidth*horizpc/100
+	centerY := head.Y() + headHeight/2
 
 	var minX, minY, maxX, maxY int
 	if strings.HasPrefix(position, "BS") || strings.HasPrefix(position, "S") {
@@ -107,7 +106,21 @@ func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string, hor
 
 	var newWin xproto.Window = 0
 
-	if position == "C" {
+	if position == "O" { // other monitor
+		if len(desk.Heads) <= 1 {
+			return
+		}
+		newHead := desk.HeadsMinusStruts[(headnum+1)%len(desk.HeadsMinusStruts)]
+		headRect := xrect.New(newHead.X(), newHead.Y(), newHead.X()+newHead.Width(), newHead.Y()+newHead.Height())
+		fmt.Println(headRect)
+		newWin = desk.NextMatchingWindow(activeWindow, func(r xrect.Rect) bool {
+			x := RectMostlyInRect(r, headRect)
+			if x {
+				fmt.Printf("Matched rect: %v\n", r)
+			}
+			return x
+		})
+	} else if position == "C" {
 		// only focus centered windows
 		minX = head.X() + (head.Width() / 20 * 5)
 		maxX = head.X() + (head.Width() / 20 * 15)
@@ -115,15 +128,14 @@ func (desk *Desktop) SmartFocus(activeWindow xproto.Window, position string, hor
 		maxY = head.Y() + (head.Height() / 20 * 15)
 		centerRect := xrect.New(minX, minY, maxX-minX, maxY-minY)
 		newWin = desk.NextMatchingWindow(activeWindow, func(r xrect.Rect) bool {
-			//return RectInRect(centerRect, r)
 			return RectMostlyInRect(r, centerRect)
 		})
 	} else {
 		cmpRect := xrect.New(minX, minY, maxX-minX, maxY-minY)
 		newWin = desk.NextMatchingWindow(activeWindow, func(r xrect.Rect) bool {
-			winArea := r.Width() * r.Height()
-			cmpArea := cmpRect.Width() * cmpRect.Height()
-			return RectMostlyInRect(r, cmpRect) && winArea < (cmpArea * 2) && winArea > (cmpArea * 15 / 20) && EachAxisMostlyOverlaps(r, cmpRect)
+			// RectMostlyInRect will match smaller windows
+			// EachAxisMostlyOverlaps will match bigger windows
+			return RectMostlyInRect(r, cmpRect) || EachAxisMostlyOverlaps(r, cmpRect)
 		})
 	}
 	if newWin != 0 {

@@ -6,11 +6,23 @@ import (
 	"github.com/BurntSushi/xgbutil/xrect"
 )
 
-func min(a, b int) int { if a < b { return a } else { return b } }
-func max(a, b int) int { if a > b { return a } else { return b } }
+func min(a, b int) int {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+func max(a, b int) int {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
 
 func lineOverlap(min1, max1, min2, max2 int) int {
-	return max(0, min(max1, max2) - max(min1, min2))
+	return max(0, min(max1, max2)-max(min1, min2))
 }
 
 func AreaOverlap(a xrect.Rect, b xrect.Rect) int {
@@ -19,21 +31,25 @@ func AreaOverlap(a xrect.Rect, b xrect.Rect) int {
 	return xOverlap * yOverlap
 }
 
+// both edges overlap by more than 75%
 func EachAxisMostlyOverlaps(a xrect.Rect, b xrect.Rect) bool {
 	x1, y1, w1, h1 := xrect.RectPieces(a)
 	x2, y2, w2, h2 := xrect.RectPieces(b)
 	iw := min(x1+w1-1, x2+w2-1) - max(x1, x2) + 1
 	ih := min(y1+h1-1, y2+h2-1) - max(y1, y2) + 1
-	fmt.Printf("%v %v: iw=%d ih=%d\n", a, b, iw, ih)
+	//fmt.Printf("%v %v: iw=%d ih=%d\n", a, b, iw, ih)
 	return iw > w2*3/4 && ih > h2*3/4
 }
 
-// is >=50% of rect "a" inside of rect "b"
+// is approx >=50% of rect "a" inside of rect "b"
 func RectMostlyInRect(a xrect.Rect, b xrect.Rect) bool {
+	// Comparing ([(1062, 389) 2777x1738], [(1920, 1065) 1920x1065]) => false
 	aArea := a.Height() * a.Width()
 	bArea := b.Height() * b.Width()
 	overlapArea := xrect.IntersectArea(a, b)
-	return overlapArea == bArea || (overlapArea*1000 > aArea*505)
+	result := (overlapArea == bArea) || (overlapArea*1000 > aArea*505)
+	//fmt.Printf("RectMostlyInRect: a=%v aArea=%v b=%v bArea=%v overlapArea=%v => %v\n", a, aArea, b, bArea, overlapArea, result)
+	return result
 }
 
 // is rect "a" inside of rect "b"
@@ -50,9 +66,9 @@ func (desk *Desktop) NextMatchingWindow(activeWindow xproto.Window, matches Rect
 	i := 0
 	activeWinIndex := -1
 
-	for win := range(desk.WindowsOnCurrentDesktop()) {
+	for win := range desk.WindowsOnCurrentDesktop() {
 		geom := desk.GetGeometryForWindow(win)
-		if matches(geom) {
+		if matches(geom) && desk.IsWindowVisible(win) && desk.CanFocusWindow(win) {
 			fmt.Printf("%d: Win(id=0x%x: x=%d,y=%d,w=%d,h=%d))\n", i, win, geom.X(), geom.Y(), geom.Width(), geom.Height())
 			matchingWindows = append(matchingWindows, win)
 			if win == activeWindow {
@@ -68,11 +84,9 @@ func (desk *Desktop) NextMatchingWindow(activeWindow xproto.Window, matches Rect
 	}
 	var nextWinIndex int
 	if activeWinIndex > -1 {
-		nextWinIndex = (activeWinIndex+1) % len(matchingWindows)
+		nextWinIndex = (activeWinIndex + 1) % len(matchingWindows)
 	} else {
-		nextWinIndex = len(matchingWindows)-1
+		nextWinIndex = len(matchingWindows) - 1
 	}
 	return matchingWindows[nextWinIndex]
 }
-
-
