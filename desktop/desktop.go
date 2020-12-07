@@ -116,13 +116,24 @@ func (desk *Desktop) IsWindowVisible(win xproto.Window) bool {
 func (desk *Desktop) CanFocusWindow(win xproto.Window) bool {
 	atomNames, err := ewmh.WmWindowTypeGet(desk.X, win)
 	if err != nil {
-		log.Fatalf("IsWindowInPager(%d): %#v", win, err)
+		return true // no such property
+		//log.Fatalf("WmWindowTypeGet(win=%d): %#v", win, err)
 	}
 	for _, n := range atomNames {
 		if n == "_NET_WM_WINDOW_TYPE_DESKTOP" {
 			return false
 		}
 	}
+	atomNames, err = ewmh.WmStateGet(desk.X, win)
+	if err != nil {
+		log.Fatalf("WmStateGet(win=%d): %#v", win, err)
+	}
+	for _, n := range atomNames {
+		if n == "_NET_WM_STATE_SKIP_TASKBAR" || n == "_NET_WM_STATE_SKIP_PAGER" {
+			return false
+		}
+	}
+	// ok, guess it's a normal window
 	return true
 }
 
