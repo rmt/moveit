@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"./desktop"
+	"github.com/rmt/myxcb/desktop"
 )
 
 func main() {

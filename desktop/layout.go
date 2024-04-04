@@ -64,8 +64,8 @@ func (desk *Desktop) SmartPlacement(w xproto.Window, position string, horizpc in
 	height = height - extents.Top - extents.Bottom
 	width = width - extents.Left - extents.Right
 	fmt.Printf("Calling desk.MoveResizeWindow(win, x=%d, y=%d, width=%d, height=%d)\n",
-		x, y, width, height)
-	desk.MoveResizeWindow(w, x, y, width, height)
+		x+8, y+6, width-16, height-12)
+	desk.MoveResizeWindow(w, x+8, y+6, width-16, height-12)
 	ewmh.RestackWindow(desk.X, w)
 }
 

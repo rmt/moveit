@@ -7,9 +7,9 @@ The primary struct is Desktop, which is returned by NewDesktop()
 There are two special functions called SmartPlacement and SmartFocus that
 will move/resize & focus windows according to a string placement, where
 these are:
-  * NE, N, NW, W, SW, S, SE, E (North-East, North, ...)
-  * C (Center)
-  * BNE, BNW, BSW, BSE (big NE, ...) [SmartPlacement only]
+  - NE, N, NW, W, SW, S, SE, E (North-East, North, ...)
+  - C (Center)
+  - BNE, BNW, BSW, BSE (big NE, ...) [SmartPlacement only]
 */
 package desktop
 
