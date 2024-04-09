@@ -1,4 +1,4 @@
-module github.com/rmt/myxcb
+module github.com/rmt/moveit
 
 go 1.22.1
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rmt/myxcb/desktop"
+	"github.com/rmt/moveit/desktop"
 )
 
 func main() {
